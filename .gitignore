@@ -1,0 +1,29 @@
+# Build outputs
+build/
+.build/
+.swiftpm/
+air/
+*.metallib
+*.air
+*.o
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Environments
+.venv/
+venv/
+
+# Model artifacts — these live on Hugging Face, not in git
+*.gguf
+*.safetensors
+*.bin
+out/
+
+# Vendored upstream (cloned at build time; see helix/integration/ggml)
+helix/third_party/llama.cpp/
+forge/llamacpp/
+
+.DS_Store
+compile_commands.json
+*.gputrace

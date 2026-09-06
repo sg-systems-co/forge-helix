@@ -1,0 +1,5 @@
+module CLlamaBridge {
+    umbrella header "include/CLlamaBridge.h"
+    link "llama"
+    export *
+}
