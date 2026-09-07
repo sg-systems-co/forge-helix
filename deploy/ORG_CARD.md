@@ -48,7 +48,12 @@ confidently wrong.
 integrated into `llama.cpp` through a 42-line patch. Chunk-parallel
 decomposition; ~3x on the isolated op for shapes upstream's fast path declines.
 
-Source: [github.com/sg-systems-co/forge-helix](https://github.com/sg-systems-co/forge-helix)
+| repository | |
+|---|---|
+| [`forge`](https://github.com/sg-systems-co/forge) | quantization |
+| [`helix`](https://github.com/sg-systems-co/helix) | Metal kernel + llama.cpp patch |
+| [`helix-chat-ui`](https://github.com/sg-systems-co/helix-chat-ui) | SwiftUI client |
+| [`forge-helix`](https://github.com/sg-systems-co/forge-helix) | overview and release tooling |
 
 ## Models
 
