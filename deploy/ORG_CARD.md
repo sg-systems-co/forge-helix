@@ -1,5 +1,10 @@
 ---
-title: SG Systems
+title: README
+emoji: "⚡"
+colorFrom: gray
+colorTo: blue
+sdk: static
+pinned: false
 ---
 
 # SG Systems

@@ -3,11 +3,21 @@
 | file | |
 |---|---|
 | `MODEL_CARD.md` | uploaded as `sgsystems/Falcon-H1-7B-FORGE-v2/README.md` |
-| `ORG_CARD.md` | uploaded as `sgsystems/README/README.md` — the org profile at huggingface.co/sgsystems |
+| `ORG_CARD.md` | uploaded as the **Space** `sgsystems/README` — the org profile at huggingface.co/sgsystems |
 | `upload_to_hf.py` | pushes the GGUF, sidecar and card in one commit |
 
-The org card lives in a repo literally named `README` under the org namespace;
-that is how Hugging Face stores organization profiles.
+**The org card is a Space, not a model repo.** Hugging Face renders the
+organization profile from a *static Space* named `README` in the org namespace:
+
+```python
+api.create_repo("<org>/README", repo_type="space", space_sdk="static")
+```
+
+Creating a **model** repo with that name does not work — the profile keeps
+showing "No organization card" and the repo shows up in the org's model list
+instead. Verified against `google/README`, `meta-llama/README` and
+`huggingface/README`, all of which are Spaces. The frontmatter is Space
+metadata (`sdk: static`, `emoji`, `colorFrom`/`colorTo`), not a document title.
 
 ```sh
 python upload_to_hf.py --dry-run    # validate, print the plan, send nothing
