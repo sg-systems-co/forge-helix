@@ -15,6 +15,7 @@ tags:
   - edge
 language:
   - en
+quantized_by: sgsystems
 ---
 
 # Falcon-H1-7B-FORGE-v2
@@ -28,9 +29,32 @@ Hybrid Mamba-2 + attention, 7.59B parameters, 44 blocks.
 | | |
 |---|---|
 | File | `falcon-h1-7b-forge-v2.gguf` (3.48 GB) |
-| Format | GGUF, `TQ2_0` ternary with Q6_K exclusions |
-| Context | 4096 recommended (see memory envelope) |
+| Format | GGUF v3, 751 tensors |
+| Parameters | 7.59 B |
+| Architecture | `falcon-h1` — 44 blocks, hybrid Mamba-2 + attention |
+| SSM | `d_state` 256, `d_inner` 3072, 24 heads, 1 group |
+| Vocab | 130 049 |
+| Trained context | 262 144 (use 4096 here — see memory envelope) |
+| BOS / EOS | 17 / 11 |
 | Chat template | ChatML, embedded in the GGUF |
+
+### Quantization layout
+
+Read straight from the file — this is the design decision, made concrete:
+
+| tensor family | count | type |
+|---|---|---|
+| `ssm_out` | 44 | **Q6_K** |
+| `ffn_down` | 44 | **Q6_K** |
+| `output` | 1 | Q6_K |
+| `token_embd` | 1 | Q4_K |
+| `attn_q` / `attn_k` / `attn_v` / `attn_output` | 176 | `TQ2_0` |
+| `ffn_gate` / `ffn_up` | 88 | `TQ2_0` |
+| `ssm_in` | 44 | `TQ2_0` |
+| norms, `ssm_conv1d`, `ssm_dt` | 353 | F32 |
+
+308 of 751 tensors are ternary; the 89 held at Q6_K are what the model needs to
+stay factual.
 
 ## Memory envelope
 
@@ -67,6 +91,29 @@ llama-cli -m falcon-h1-7b-forge-v2.gguf -c 4096 -ub 512 \
   --temp 0.7 --top-p 0.9 --top-k 40 \
   --repeat-penalty 1.15 --repeat-last-n 2048
 ```
+
+<details>
+<summary>llama-cpp-python</summary>
+
+```python
+from llama_cpp import Llama
+
+llm = Llama(
+    model_path="falcon-h1-7b-forge-v2.gguf",
+    n_ctx=4096, n_ubatch=512, n_gpu_layers=-1, use_mmap=True,
+)
+out = llm.create_chat_completion(
+    messages=[
+        {"role": "system", "content": "You are a helpful, knowledgeable, and precise AI assistant."},
+        {"role": "user", "content": "Make me a carrot cake."},
+    ],
+    temperature=0.7, top_p=0.9, top_k=40,
+    repeat_penalty=1.15,          # and set repeat_last_n=2048 on the context
+)
+print(out["choices"][0]["message"]["content"])
+```
+
+</details>
 
 ### Why `repeat_last_n` matters more than `repeat_penalty`
 
@@ -145,6 +192,16 @@ HELIX accelerates prefill only; decode is bandwidth-bound and untouched. The
 model runs correctly on stock `llama.cpp` — HELIX is an optional speedup, not a
 requirement.
 
+## Intended use
+
+Built for **on-device assistant workloads on Apple Silicon** where the memory
+budget is the binding constraint — a 7B-class model that fits beside a running
+OS rather than one that needs a workstation.
+
+Not intended for: batch serving (the memory savings buy nothing when VRAM is
+plentiful and the quantization costs accuracy), tasks needing long multi-turn
+coherence (see below), or anything where a factual error is expensive.
+
 ## Limitations
 
 - **Cross-turn repetition persists** at ~19.7% over four turns even with correct
@@ -153,9 +210,12 @@ requirement.
   steps") are followed; instructions about the conversation ("repeat my first
   message") are not. This is a quantization ceiling.
 - **English only**, inherited from the calibration set and evaluation.
-- **Not evaluated on standard benchmarks.** Claims here rest on targeted factual
-  probes and repetition measurement, not MMLU/HellaSwag. Treat it as an
-  engineering artifact, not a leaderboard entry.
+- **Not evaluated on standard benchmarks.** Everything quoted here comes from
+  targeted factual probes and automated repetition measurement — no MMLU,
+  HellaSwag or perplexity-vs-baseline numbers. Treat it as an engineering
+  artifact, not a leaderboard entry. In particular, **no perplexity comparison
+  against the fp16 source or a standard Q4_K_M build has been run**, so the
+  accuracy cost of 2.06 bpw is characterised only where it was probed.
 - Inherits all limitations and the license of `tiiuae/Falcon-H1-7B-Instruct`.
 
 ## Files
