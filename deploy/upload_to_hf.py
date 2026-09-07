@@ -23,8 +23,9 @@ from pathlib import Path
 # HF repo ids are case-sensitive: "SG-Systems" is a 404, the org's canonical id
 # is "sgsystems". Kept as a flag so a personal namespace can be targeted too.
 DEFAULT_REPO = "sgsystems/Falcon-H1-7B-FORGE-v2"
+# FORGE writes artifacts to forge/out by default; override with --artifacts.
 DEFAULT_ARTIFACT_DIR = Path(
-    "/Users/sebastiangrebe/Documents/Git/forge/out"
+    os.environ.get("FORGE_OUT_DIR", Path(__file__).resolve().parents[1] / "forge" / "out")
 )
 MODEL_FILE = "falcon-h1-7b-forge-v2.gguf"
 SIDECAR_FILE = "falcon-h1-7b-forge-v2.forge.json"

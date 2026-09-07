@@ -227,4 +227,4 @@ coherence (see below), or anything where a factual error is expensive.
 
 ## Links
 
-FORGE, HELIX and the SwiftUI client: https://github.com/sgsystems/forge-helix
+FORGE, HELIX and the SwiftUI client: https://github.com/sg-systems-co/forge-helix

@@ -44,9 +44,12 @@ func hallucinationMarkers(_ t: String) -> [String] {
 
 // Same prompt, same settings, both builds -- the earlier v1 numbers used a
 // different seed prompt and were not comparable.
-let v1 = "/Users/sebastiangrebe/Documents/Git/forge/out/falcon-h1-7b-forge-mixed.gguf"
-let v2 = "/Users/sebastiangrebe/Documents/Git/forge/out/falcon-h1-7b-forge-v2.gguf"
-let which = ProcessInfo.processInfo.environment["MODEL"] == "v1" ? v1 : v2
+// MODEL=v1 points at the uniformly-ternary build for A/B comparison; both
+// resolve through $HELIX_MODEL_PATH / the executable directory by default.
+let env = ProcessInfo.processInfo.environment
+let v2 = EngineConfig.defaultModelPath
+let v1 = env["HELIX_MODEL_PATH_V1"] ?? v2.replacingOccurrences(of: "forge-v2", with: "forge-mixed")
+let which = env["MODEL"] == "v1" ? v1 : v2
 
 let engine = LlamaEngine(config: EngineConfig(modelPath: which, maxOutputTokens: 400))
 do { try await engine.load() } catch { line("LOAD FAILED: \(error)"); exit(1) }

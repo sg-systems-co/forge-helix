@@ -134,6 +134,17 @@ public struct SamplingConfig: Sendable {
 }
 
 public struct EngineConfig: Sendable {
+    /// $HELIX_MODEL_PATH, else `falcon-h1-7b-forge-v2.gguf` next to the binary.
+    /// Download from https://huggingface.co/sgsystems/Falcon-H1-7B-FORGE-v2
+    public static var defaultModelPath: String {
+        if let env = ProcessInfo.processInfo.environment["HELIX_MODEL_PATH"], !env.isEmpty {
+            return env
+        }
+        let exeDir = Bundle.main.executableURL?.deletingLastPathComponent()
+            ?? URL(fileURLWithPath: ".")
+        return exeDir.appendingPathComponent("falcon-h1-7b-forge-v2.gguf").path
+    }
+
     public var modelPath: String
     public var contextLength: UInt32
     public var batchSize: UInt32
@@ -148,7 +159,10 @@ public struct EngineConfig: Sendable {
     public init(
         // FORGE v2: ssm_out and ffn_down preserved at Q6_K, which is what
         // restores factual recall over the uniformly-ternary v1 build.
-        modelPath: String = "/Users/sebastiangrebe/Documents/Git/forge/out/falcon-h1-7b-forge-v2.gguf",
+        //
+        // Override with $HELIX_MODEL_PATH; otherwise looks for the GGUF beside
+        // the executable, which is where a downloaded model naturally lands.
+        modelPath: String = EngineConfig.defaultModelPath,
         // 4096, not 8192. Peak RSS measured at 3.59 / 3.68 / 3.86 GB for
         // n_ctx 2048 / 4096 / 8192; the iOS-style ~3.7 GB kill budget only
         // holds at 4096. Doubling the context costs ~180 MB of KV cache.

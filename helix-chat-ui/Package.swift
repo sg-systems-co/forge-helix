@@ -4,8 +4,10 @@ import Foundation
 
 // Where the HELIX-accelerated llama.cpp was built. Override with
 //   HELIX_LLAMA_BUILD=/path/to/llama.cpp/build swift build
+// Defaults to the sibling checkout layout described in the README; override for
+// anything else.
 let llamaBuild = ProcessInfo.processInfo.environment["HELIX_LLAMA_BUILD"]
-    ?? "/Users/sebastiangrebe/Documents/Git/helix/third_party/llama.cpp/build"
+    ?? "\(Context.packageDirectory)/../helix/third_party/llama.cpp/build"
 
 let llamaInclude = "\(llamaBuild)/../include"
 let ggmlInclude  = "\(llamaBuild)/../ggml/include"
