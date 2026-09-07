@@ -32,6 +32,9 @@ api.create_commit(repo_id="<org>/README", repo_type="space",
 Frontmatter is Space metadata (`title`, `emoji`, `colorFrom`/`colorTo`,
 `sdk: static`, `pinned`), not a document title.
 
+Artifacts are read from a sibling `forge` checkout by default; override with
+`--artifacts` or `$FORGE_OUT_DIR`.
+
 ```sh
 python upload_to_hf.py --dry-run    # validate, print the plan, send nothing
 python upload_to_hf.py --confirm    # publish

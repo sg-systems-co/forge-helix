@@ -13,6 +13,17 @@ Two halves that solve different problems:
 
 Plus **HelixChatUI**, a native SwiftUI client that ties them together.
 
+| repository | |
+|---|---|
+| [`forge`](https://github.com/sg-systems-co/forge) | mixed-precision post-training quantization |
+| [`helix`](https://github.com/sg-systems-co/helix) | the Metal SSM-scan kernel and its llama.cpp patch |
+| [`helix-chat-ui`](https://github.com/sg-systems-co/helix-chat-ui) | native SwiftUI client |
+| [`Falcon-H1-7B-FORGE-v2`](https://huggingface.co/sgsystems/Falcon-H1-7B-FORGE-v2) | the compiled weights |
+
+This repository is the overview and the release tooling; the code lives in the
+repositories above rather than being vendored here, so there is one copy of each
+component and no chance of the two drifting apart.
+
 ---
 
 ## The physics
@@ -81,7 +92,7 @@ Configuration is recorded in the `.forge.json` sidecar shipped beside the GGUF
 (`forge.solver.excluded_tensors = ffn_down,ssm_out`), so a build is reproducible
 from the artifact alone.
 
-See [`forge/`](forge/) and its [algorithm notes](forge/docs/algorithm.md).
+**Source:** [github.com/sg-systems-co/forge](https://github.com/sg-systems-co/forge)
 
 ---
 
@@ -142,8 +153,9 @@ tolerance. **It does not engage on this model** — Falcon-H1's `d_state` is 256
 while the MPP kernel is compiled for 128, so it falls back to fp32. The app
 reports which path is live under the `...` menu rather than letting you assume.
 
-See [`helix/`](helix/), [`docs/PRECISION.md`](helix/docs/PRECISION.md), and the
-[upstream patch](helix/integration/ggml/llama.cpp-helix.patch).
+**Source:** [github.com/sg-systems-co/helix](https://github.com/sg-systems-co/helix) — including
+[`docs/PRECISION.md`](https://github.com/sg-systems-co/helix/blob/main/docs/PRECISION.md) and the
+[upstream patch](https://github.com/sg-systems-co/helix/blob/main/integration/ggml/llama.cpp-helix.patch).
 
 ---
 
@@ -213,13 +225,20 @@ Raising the *strength* instead makes it worse (`penalty_repeat` 1.25 at window
 2048 scored 27.9%). Shipping the parameter triple without the window reproduces
 the bug.
 
-See [`helix-chat-ui/README.md`](helix-chat-ui/README.md).
+**Source:** [github.com/sg-systems-co/helix-chat-ui](https://github.com/sg-systems-co/helix-chat-ui)
 
 ---
 
 ## Build
 
+The three components are separate repositories. Check them out as siblings —
+that is the layout the default paths assume.
+
 ```sh
+git clone https://github.com/sg-systems-co/helix
+git clone https://github.com/sg-systems-co/helix-chat-ui
+git clone https://github.com/sg-systems-co/forge
+
 # 1. HELIX kernels
 cd helix && cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 ctest --test-dir build          # 216 parity + 8 drift cases
@@ -234,7 +253,9 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build
 
 # 3. The app
-cd ../../../helix-chat-ui && swift run -c release HelixChatUI
+cd ../../../helix-chat-ui
+export HELIX_MODEL_PATH=/path/to/falcon-h1-7b-forge-v2.gguf
+swift run -c release HelixChatUI
 ```
 
 Requires macOS 14+, Xcode 26 with the Metal toolchain
