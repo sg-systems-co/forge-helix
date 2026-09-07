@@ -242,7 +242,7 @@ Requires macOS 14+, Xcode 26 with the Metal toolchain
 
 ## Model
 
-[`SG-Systems/Falcon-H1-7B-FORGE-v2`](https://huggingface.co/SG-Systems/Falcon-H1-7B-FORGE-v2)
+[`sgsystems/Falcon-H1-7B-FORGE-v2`](https://huggingface.co/sgsystems/Falcon-H1-7B-FORGE-v2)
 — see [`deploy/MODEL_CARD.md`](deploy/MODEL_CARD.md).
 
 ## Honest limitations

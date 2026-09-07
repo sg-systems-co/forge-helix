@@ -21,4 +21,4 @@ Auth via `huggingface-cli login` or `$HF_TOKEN`.
 
 **Note:** the target namespace was specified as both `sgsystems` and
 `SG-Systems`. HF repo ids are case-sensitive; the default is
-`SG-Systems/Falcon-H1-7B-FORGE-v2`, override with `--repo`.
+`sgsystems/Falcon-H1-7B-FORGE-v2`, override with `--repo`.
