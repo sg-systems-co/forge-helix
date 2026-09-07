@@ -20,8 +20,8 @@ import os
 import sys
 from pathlib import Path
 
-# The organisation was given as both "sgsystems" and "SG-Systems"; HF repo ids
-# are case-sensitive, so it is a flag rather than a constant.
+# HF repo ids are case-sensitive: "SG-Systems" is a 404, the org's canonical id
+# is "sgsystems". Kept as a flag so a personal namespace can be targeted too.
 DEFAULT_REPO = "sgsystems/Falcon-H1-7B-FORGE-v2"
 DEFAULT_ARTIFACT_DIR = Path(
     "/Users/sebastiangrebe/Documents/Git/forge/out"
