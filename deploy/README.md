@@ -2,8 +2,12 @@
 
 | file | |
 |---|---|
-| `MODEL_CARD.md` | uploaded as the Hugging Face repo `README.md` |
+| `MODEL_CARD.md` | uploaded as `sgsystems/Falcon-H1-7B-FORGE-v2/README.md` |
+| `ORG_CARD.md` | uploaded as `sgsystems/README/README.md` — the org profile at huggingface.co/sgsystems |
 | `upload_to_hf.py` | pushes the GGUF, sidecar and card in one commit |
+
+The org card lives in a repo literally named `README` under the org namespace;
+that is how Hugging Face stores organization profiles.
 
 ```sh
 python upload_to_hf.py --dry-run    # validate, print the plan, send nothing
