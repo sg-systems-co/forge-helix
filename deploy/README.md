@@ -6,18 +6,31 @@
 | `ORG_CARD.md` | uploaded as the **Space** `sgsystems/README` — the org profile at huggingface.co/sgsystems |
 | `upload_to_hf.py` | pushes the GGUF, sidecar and card in one commit |
 
-**The org card is a Space, not a model repo.** Hugging Face renders the
-organization profile from a *static Space* named `README` in the org namespace:
+**The org card is a static Space containing only `README.md`.** Two things have
+to be right, and getting either wrong fails in a differently confusing way:
+
+1. **It must be a Space, not a model repo.** A model repo named `README` leaves
+   the profile showing "No organization card" *and* appears in the org's model
+   list, so one model looks like two.
+
+2. **`index.html` must not exist.** `create_repo(space_sdk="static")` scaffolds
+   `index.html` and `style.css`, and a static Space serves `index.html` — so the
+   profile renders "Welcome to your static Space!" instead of the card. Working
+   org cards (`google/README`, `meta-llama/README`, `huggingface/README`) all
+   ship exactly `.gitattributes` + `README.md`.
 
 ```python
-api.create_repo("<org>/README", repo_type="space", space_sdk="static")
+api.create_repo("<org>/README", repo_type="space", space_sdk="static", exist_ok=True)
+api.create_commit(repo_id="<org>/README", repo_type="space",
+                  operations=[CommitOperationAdd("README.md", "ORG_CARD.md")])
+# then delete the scaffold, or the card will not render:
+api.create_commit(repo_id="<org>/README", repo_type="space",
+                  operations=[CommitOperationDelete("index.html"),
+                              CommitOperationDelete("style.css")])
 ```
 
-Creating a **model** repo with that name does not work — the profile keeps
-showing "No organization card" and the repo shows up in the org's model list
-instead. Verified against `google/README`, `meta-llama/README` and
-`huggingface/README`, all of which are Spaces. The frontmatter is Space
-metadata (`sdk: static`, `emoji`, `colorFrom`/`colorTo`), not a document title.
+Frontmatter is Space metadata (`title`, `emoji`, `colorFrom`/`colorTo`,
+`sdk: static`, `pinned`), not a document title.
 
 ```sh
 python upload_to_hf.py --dry-run    # validate, print the plan, send nothing
