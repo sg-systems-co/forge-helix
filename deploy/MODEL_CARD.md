@@ -21,8 +21,9 @@ quantized_by: sgsystems
 # Falcon-H1-7B-FORGE-v2
 
 `Falcon-H1-7B-Instruct` quantized to **2.06 bpw average / 3.48 GB** with FORGE,
-a mixed-precision post-training method. Runs on Apple Silicon in **3.73 GB
-resident** at **75 tok/s** decode.
+a mixed-precision post-training method. **3.73 GB resident at 75 tok/s decode on
+an M5 Max**; runs on an iPhone (A16, 6 GB) at 5.5 tok/s decode — see the memory
+envelope and open issues below before planning a phone deployment.
 
 Hybrid Mamba-2 + attention, 7.59B parameters, 44 blocks.
 
@@ -67,11 +68,60 @@ measured on an M5 Max with `n_ubatch = 512`:
 | **4096 (recommended)** | **3.68 GB** |
 | 8192 | 3.86 GB |
 
-Apple platforms terminate a process near ~3.7 GB. **Use `n_ctx = 4096`**;
-8192 exceeds the budget on memory-constrained devices. A native SwiftUI host adds
-roughly 50 MB on top.
+**Use `n_ctx = 4096`** on a Mac; 8192 costs another ~180 MB of KV cache.
+A native SwiftUI host adds roughly 50 MB on top.
+
+### On iOS the binding constraint is different
+
+Measured on an iPhone 14 Pro Max (A16, 6 GB), the process **footprint peaks at
+0.31 GB** — the mmap'd weights are clean, file-backed pages and are not charged
+to `phys_footprint`, so the jetsam limit is never approached. What binds instead
+is Metal's `recommendedMaxWorkingSetSize` (4096 MiB on that device):
+
+| | MiB |
+|---|---|
+| model weight buffer views | 3626.47 |
+| KV cache (`n_ctx` 2048) | 88.00 |
+| recurrent SSM state | 133.80 |
+| compute buffer (`n_ubatch` 256) | 170.01 |
+| **total** | **4018.28** of 4096.02 |
+
+`n_ubatch = 256` is required on 6 GB devices — at 512 the compute buffer is
+340 MiB, which puts the total 92 MiB over and every command buffer fails with
+`kIOGPUCommandBufferCallbackErrorOutOfMemory`. Note that
+`com.apple.developer.kernel.increased-memory-limit` raises the *jetsam* limit and
+has no effect on this ceiling.
 
 Load with `mmap` so the OS and Metal share the same pages under unified memory.
+
+## Quality
+
+Wikitext2 perplexity, measured against the F16 source:
+
+| build | size | wikitext2 ppl | vs F16 | factual probes | decode t/s |
+|---|---:|---:|---:|---:|---:|
+| F16 | 15.18 GB | 6.5875 | 1.00x | 12/12 | 29.1 |
+| v1 (`ssm_out` ternary, 32 calib) | 3.25 GB | 10.7590 | 1.63x | 9/12 | ~63 |
+| **v2 (`ssm_out` Q6_K, 128 calib)** | **3.48 GB** | **9.1633** | **1.39x** | **12/12** | ~63 |
+
++0.23 GB over v1 buys back full factual recall on the probe set and 15% of the
+perplexity gap, at 4.4x smaller than F16.
+
+What v1 got wrong is worth seeing, because two of the three failures were not
+loops — they were fluent and confidently incorrect:
+
+| probe | v1 | v2 |
+|---|---|---|
+| carrot cake ingredients | `"carrot cake mix, carrot cake mix, …"` | `"Carrots, sugar, flour, eggs, butter, cinnamon…"` |
+| capital of Australia | **`"Sydney"`** | `"Canberra"` |
+| boiling point of water | **`"99°C"`** | `"100°C"` |
+
+**Read this with two caveats.** The v2 run changed two variables at once —
+preserving `ssm_out` *and* raising calibration from 32 to 128 sequences — so the
+recovery cannot be attributed between them; the Hessian flatness outlier on
+`ssm_out` (6.78 against ~0.33 elsewhere) makes it the likelier cause, but that is
+inference. And there is no same-size `Q4_K_M` baseline, so "better than
+conventional 4-bit at this footprint" is **not** a claim this data supports.
 
 ## Required sampling parameters
 
@@ -202,7 +252,7 @@ Not intended for: batch serving (the memory savings buy nothing when VRAM is
 plentiful and the quantization costs accuracy), tasks needing long multi-turn
 coherence (see below), or anything where a factual error is expensive.
 
-## Limitations
+## Behavioural limitations
 
 - **Cross-turn repetition persists** at ~19.7% over four turns even with correct
   sampling.
@@ -210,13 +260,35 @@ coherence (see below), or anything where a factual error is expensive.
   steps") are followed; instructions about the conversation ("repeat my first
   message") are not. This is a quantization ceiling.
 - **English only**, inherited from the calibration set and evaluation.
-- **Not evaluated on standard benchmarks.** Everything quoted here comes from
-  targeted factual probes and automated repetition measurement — no MMLU,
-  HellaSwag or perplexity-vs-baseline numbers. Treat it as an engineering
-  artifact, not a leaderboard entry. In particular, **no perplexity comparison
-  against the fp16 source or a standard Q4_K_M build has been run**, so the
-  accuracy cost of 2.06 bpw is characterised only where it was probed.
+- **Not evaluated on standard benchmarks.** No MMLU or HellaSwag. Perplexity
+  against the fp16 source *has* been measured (see Quality above); a same-size
+  `Q4_K_M` baseline has not. Treat this as an engineering artifact, not a
+  leaderboard entry.
 - Inherits all limitations and the license of `tiiuae/Falcon-H1-7B-Instruct`.
+
+## Known Limitations & Open Issues
+
+**#1 — No same-size baseline.** Perplexity against F16 is measured (1.39x, above),
+but a standard `Q4_K_M` build has not been. Whether 2.06 bpw mixed-precision
+actually beats conventional 4-bit at comparable size is open. The v2 attribution
+is also confounded (see Quality).
+
+**#2 — Overlapping buffer views waste 312 MiB.** The mapped model is 3313.51 MiB,
+but exceeding Metal's `maxBufferLength` makes ggml split it into two overlapping
+views (3072.00 + 554.09 MiB) that both count against the GPU working set. On a
+6 GB iPhone this leaves the app at 98% of its budget, where prefill completes but
+is intermittently `SIGKILL`ed.
+
+**#3 — Decode gates mobile UX.** 5.5 tok/s on A16 — a 146-token reply takes 26 s.
+That is ~18 GB/s effective, roughly half the chip's LPDDR5 ceiling, so it is
+bandwidth-bound rather than broken. HELIX accelerates prefill only, by design; a
+fused single-step decode kernel is what interactive phone speed requires.
+
+**#4 — The HELIX MPP path has never engaged for this model.** `HELIX_MPP_K` is a
+compile-time 128 and Falcon-H1 uses `d_state = 256`, so the runtime falls back
+silently to the fp32 `simdgroup_matrix` path. The 4.62x MPP figure quoted
+elsewhere for HELIX has never applied to this model on any hardware. Supporting
+`d_state = 256` needs a second descriptor instantiation or `dynamic_extent`.
 
 ## Files
 
