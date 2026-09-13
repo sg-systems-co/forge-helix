@@ -242,6 +242,30 @@ HELIX accelerates prefill only; decode is bandwidth-bound and untouched. The
 model runs correctly on stock `llama.cpp` — HELIX is an optional speedup, not a
 requirement.
 
+### Neural accelerators (`GGML_HELIX_MPP=1`)
+
+On an M5, HELIX can run its Pass C on the Neural Accelerators in bf16. This
+model's `d_state = 256` is supported:
+
+| | fp32 (default) | MPP | |
+|---|---:|---:|---:|
+| SSM_SCAN alone | 3.733 ms | 2.250 ms | 1.66x |
+| prefill (2048 tok) | 1922.8 t/s | 2078.6 t/s | 1.081x |
+| wikitext-2 PPL | 10.8016 | 10.8018 | neutral |
+
+**It is opt-in, and the default is fp32.** bf16 operands fail llama.cpp's own
+`test-backend-ops -o SSM_SCAN` at its 2e-7 bar in 7 of 13 cases, where the fp32
+path passes 13/13 — so enabling it by default would mean shipping something that
+fails the host project's test suite. The perplexity column says that tolerance
+is far stricter than model quality requires, but relaxing it is upstream's call.
+
+Set `GGML_HELIX_MPP=1` to take it. The bridge names the kernel it chose once per
+process, so you never have to infer it from throughput:
+
+```
+ggml_metal_op_ssm_scan_helix: kernel = mpp (d_state=256) (d_state=256 head_dim=128 n_head=24)
+```
+
 ## Intended use
 
 Built for **on-device assistant workloads on Apple Silicon** where the memory
@@ -283,22 +307,6 @@ is intermittently `SIGKILL`ed.
 That is ~18 GB/s effective, roughly half the chip's LPDDR5 ceiling, so it is
 bandwidth-bound rather than broken. HELIX accelerates prefill only, by design; a
 fused single-step decode kernel is what interactive phone speed requires.
-
-**#4 — RESOLVED: the HELIX MPP path now covers this model.** HELIX previously
-compiled its MPP Pass C only for `d_state = 128`, so Falcon-H1 at 256 fell back
-silently to the fp32 `simdgroup_matrix` path. Pass C is now instantiated for
-both extents, and on an M5 Max the scan runs **1.66x** faster (3.733 → 2.250 ms)
-for **1.081x** on end-to-end prefill (pp2048: 1922.8 → 2078.6 t/s).
-
-It is **opt-in**, via `GGML_HELIX_MPP=1`, and stays that way deliberately: bf16
-operands fail llama.cpp's own `test-backend-ops -o SSM_SCAN` at its 2e-7 fp32
-bar in 7 of 13 cases, where the fp32 path passes 13/13.
-
-End to end that makes no difference to this model: wikitext-2 over 40 chunks
-measures **10.8018** on the MPP path against **10.8016** on fp32, a delta of
-0.001 standard errors. The op tolerance is far stricter than model quality
-requires — but shipping a default that fails the host project's own test suite
-is upstream's decision to make, not ours to take locally.
 
 ## Files
 
